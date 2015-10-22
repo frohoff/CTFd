@@ -186,16 +186,12 @@ function marksolves() {
               solvedValue = solve && solve.value || 0;
             }           
 
-            if (solvedValue > 0) {              
-              if (solvedValue == chal.value) {
+            if (solvedValue == chal.value || 0) {
                 elt.addClass('secondary')
                 elt.css('opacity', '0.3');
-              } else {
-                elt.css('opacity', '0.3');
-
-              }
-            }
-            
+            } else if (solvedValue > 0) {                             
+                elt.css('opacity', '0.6');              
+            }            
           }
         }
 

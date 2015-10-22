@@ -116,7 +116,7 @@ def chal(chalids):
     if authed():
         logger = logging.getLogger('keys')
 
-        chalids = chalids.split(",")
+        chalids = map(lambda x: int(x), chalids.split(","))
         num_submitted = len(chalids)
 
         fails = WrongKeys.query.filter(WrongKeys.team == session['id'], WrongKeys.chalid.in_(chalids)).count()
@@ -144,7 +144,7 @@ def chal(chalids):
         if len(solves) < num_submitted: # unsolved challenges
 
             solvedIds = map(lambda x: x.chalid, solves)
-            unsolvedIds = set(chalids).difference(set(solvedIds))
+            unsolvedIds = set(chalids).difference(set(solvedIds)) # watch types here
             challenges = Challenges.query.filter(Challenges.id.in_(unsolvedIds)).order_by(Challenges.value).all()
 
             for chal in challenges:
