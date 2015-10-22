@@ -56,4 +56,4 @@ target/
 *.db
 *.log
 .idea/
-static/uploads
+CTFd/static/uploads

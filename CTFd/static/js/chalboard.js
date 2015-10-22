@@ -28,9 +28,20 @@ String.prototype.hashCode = function() {
 var challenges;
 
 function loadchal(id) {
-    obj = $.grep(challenges['game'], function (e) {
+    var grouped = groupchals(challenges['game']);
+    var obj;
+    for (cat in grouped) {
+      chals = grouped[cat];
+      for (i in chals) {
+        chal = chals[i];
+        if (chal.id == id) {
+          obj = chal;
+        }
+      }
+    }
+/*    obj = $.grep(challenges['game'], function (e) {
         return e.id == id;
-    })[0]
+    })[0]*/
     window.location.hash = obj.name
     $('#chal-window .chal-name').text(obj.name)
     $('#chal-window .chal-desc').html(marked(obj.description, {'gfm':true, 'breaks':true}))
@@ -54,9 +65,21 @@ function loadchal(id) {
 }
 
 function loadchalbyname(chalname) {
-  obj = $.grep(challenges['game'], function (e) {
+/*  obj = $.grep(challenges['game'], function (e) {
       return e.name == chalname;
-  })[0]
+  })[0]*/
+  var grouped = groupchals(challenges['game']);
+  var obj;
+  for (cat in grouped) {
+    chals = grouped[cat];
+    for (i in chals) {
+      chal = chals[i];
+      if (chal.name == chalname) {
+        obj = chal;
+      }
+    }
+  }
+
   window.location.hash = obj.name
   $('#chal-window .chal-name').text(obj.name)
   $('#chal-window .chal-desc').html(marked(obj.description, {'gfm':true, 'breaks':true}))
@@ -136,11 +159,51 @@ function submitkey(chal, key, nonce) {
 function marksolves() {
     $.get('/solves', function (data) {
         solves = $.parseJSON(JSON.stringify(data));
+        solvesById = []
         for (var i = solves['solves'].length - 1; i >= 0; i--) {
+          var solve = solves['solves'][i];
+          id = solve.chalid
+          solvesById[id] = solve;          
+        };        
+
+        var grouped = groupchals(challenges['game']);
+        for (cat in grouped) {
+          var chals = grouped[cat];
+          for (i in chals) {
+            var chal = chals[i];  
+            var chalid = chal.id;          
+            var solvedValue = 0;
+            var elt = $('#challenges button[value="' + chalid + '"]');
+            if (chal.grouped) {
+              for (m in chal.members) {
+                var mem = chal.members[m];
+                var solve = solvesById[mem.id];
+                solvedValue += solve && solve.value || 0;
+              }
+              elt.find("span.solvedValue").text(solvedValue);
+            } else {
+              var solve = solvesById[chal.id]
+              solvedValue = solve && solve.value || 0;
+            }           
+
+            if (solvedValue > 0) {              
+              if (solvedValue == chal.value) {
+                elt.addClass('secondary')
+                elt.css('opacity', '0.3');
+              } else {
+                elt.css('opacity', '0.3');
+
+              }
+            }
+            
+          }
+        }
+
+/*        for (var i = solves['solves'].length - 1; i >= 0; i--) {
             id = solves['solves'][i].chalid
             $('#challenges button[value="' + id + '"]').addClass('secondary')
             $('#challenges button[value="' + id + '"]').css('opacity', '0.3')
-        };
+        };*/
         if (window.location.hash.length > 0){
           loadchalbyname(window.location.hash.substring(1))
         }
@@ -190,26 +253,132 @@ function getsolves(id){
   });
 }
 
+function chalgroup(n) {
+  var split = $.map(n.split(":"), function(x, i) { return x.trim(); });
+  if (split.length == 1) {
+    split.unshift(null);
+  }
+  return split;
+}
+
+function compareValues(a,b) {
+    return a.value - b.value;
+}
+
+function notempty(v){return v!==''}
+
+function groupchals(chals) {  
+  var cats = {};
+  var groups = {};
+  var catGroups = [];
+
+  for (i = 0; chals[i]; i++) {
+      var chal = chals[i];
+      var cat = chal.category;
+      if (!cats[cat]) {
+        cats[cat] = [];
+      }
+      var grouping = chalgroup(chals[i].name);
+      var group = grouping[0];      
+      if (group) {
+        var catGroup = [cat, group];
+        if (!groups[catGroup]) {
+          groups[catGroup] = [];
+          catGroups.push(catGroup);
+        }
+        groups[catGroup].push(chal);
+      } else {
+        cats[cat].push(chal);
+      }
+  };
+
+  for (i in catGroups) {
+    var catGroup = catGroups[i];
+    var groupChals = groups[catGroup].sort(compareValues);
+    var ids = [];
+    var names = [];
+    var descs = [];
+    var values = [];
+    var files = [];
+    var solves = 0;
+    var members = [];
+
+    var cat = catGroup[0];
+    var group = catGroup[1];    
+
+    for (j in groupChals) {
+      var chal = groupChals[j];
+      members.push(chal);
+      ids.push(chal.id);
+      names.push(chal.name);
+      descs.push(chal.description);   
+      values.push(chal.value);
+      files = files.concat(chal.files || []);
+      solves += (chal.solves || 0);      
+    }
+
+    var chal = {
+      grouped: true,
+      id: ids.join(","),
+      name: group,
+      description: descs.filter(notempty).join("\n\n"),
+      value: values.reduce(function(s, x){ return s + x; }, 0),
+      category: cat,
+      files: files,
+      solves: solves,
+      members: members
+    };
+
+    cats[cat].push(chal);
+  }
+
+  for (cat in cats) {
+    cats[cat].sort(compareValues);
+  }
+
+  return cats;
+}
+
 function loadchals() {
 
     $.get("/chals", function (data) {
         categories = [];
         challenges = $.parseJSON(JSON.stringify(data));
+        var grouped = groupchals(challenges['game']);
 
-
-        for (var i = challenges['game'].length - 1; i >= 0; i--) {
+/*        for (var i = challenges['game'].length - 1; i >= 0; i--) {
             challenges['game'][i].solves = 0
             if ($.inArray(challenges['game'][i].category, categories) == -1) {
                 categories.push(challenges['game'][i].category)
                 $('#challenges').append($('<tr id="' + challenges['game'][i].category.replace(/ /g,"-").hashCode() + '"><td class="large-2"><h4>' + challenges['game'][i].category + '</h4></td></tr>'))
             }
-        };
+        };*/
 
-        for (var i = 0; i <= challenges['game'].length - 1; i++) {
+        for (cat in grouped) {  
+          var hash = cat.replace(/ /g,"-").hashCode();        
+          categories.push(cat);
+          $('#challenges').append(
+            $('<tr id="' + cat.replace(/ /g,"-").hashCode() + '"><td class="large-2"><h4>' 
+              + cat
+            + '</h4></td></tr>'))
+          var chals = grouped[cat];
+          for (i in chals) {
+            var chal = chals[i];            
+            var chal_button = $((
+              '<button class="chal-button" value="{0}"><p>{1}</p>'
+              + (chal.grouped ? '<span class="solvedValue">0</span> / ' : '')
+              + '<span class="totalValue">{2}</span></button>').format(chal.id, chal.name, chal.value));
+            $('#' + hash).append(chal_button);
+          }
+        }
+
+/*        for (var i = 0; i <= challenges['game'].length - 1; i++) {
             var chal = challenges['game'][i]
+            var cat = chal.category.replace(/ /g,"-").hashCode();
             var chal_button = $('<button class="chal-button" value="{0}"><p>{1}</p><span>{2}</span></button>'.format(chal.id, chal.name, chal.value))
-            $('#' + challenges['game'][i].category.replace(/ /g,"-").hashCode()).append(chal_button);
-        };
+            $('#' + cat).append(chal_button);
+        };*/
+        
         updatesolves()
         marktoomanyattempts()
         marksolves()
@@ -273,7 +442,7 @@ $(document).on('close', '[data-reveal]', function () {
 function update(){
     $('#challenges').empty()
     loadchals()
-    solves_graph()
+    //solves_graph()
 }
 
 $(function() {

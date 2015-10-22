@@ -7,6 +7,7 @@ import time
 import re
 import logging
 import json
+import itertools
 
 challenges = Blueprint('challenges', __name__)
 
@@ -35,6 +36,8 @@ def chals():
                 return redirect('/')
     if can_view_challenges():
         chals = Challenges.query.add_columns('id', 'name', 'value', 'description', 'category').order_by(Challenges.value).all()
+        #tags = Tags.query.add_columns('id', 'chal', 'tag').all()
+        #tagsByChal = itertools.groupby(sorted(tags, lambda x: x['chal']), lambda x: x['chal'])
 
         json = {'game':[]}
         for x in chals:
@@ -96,22 +99,28 @@ def fails(teamid):
     return jsonify(json)
 
 
-@challenges.route('/chal/<chalid>/solves', methods=['GET'])
-def who_solved(chalid):
-    solves = Solves.query.filter_by(chalid=chalid).order_by(Solves.date.asc())
+@challenges.route('/chal/<chalids>/solves', methods=['GET'])
+def who_solved(chalids):
+    chalids = chalids.split(",")
+    solves = Solves.query.filter(Solves.chalid.in_(chalids)).order_by(Solves.date.asc())
     json = {'teams':[]}
     for solve in solves:
         json['teams'].append({'id':solve.team.id, 'name':solve.team.name, 'date':solve.date})
     return jsonify(json)
 
 
-@challenges.route('/chal/<chalid>', methods=['POST'])
-def chal(chalid):
+@challenges.route('/chal/<chalids>', methods=['POST'])
+def chal(chalids):
     if not ctftime():
         return redirect('/challenges')
     if authed():
-        fails = WrongKeys.query.filter_by(team=session['id'], chalid=chalid).count()
         logger = logging.getLogger('keys')
+
+        chalids = chalids.split(",")
+        num_submitted = len(chalids)
+
+        fails = WrongKeys.query.filter(WrongKeys.team == session['id'], WrongKeys.chalid.in_(chalids)).count()
+        
         data = (time.strftime("%m/%d/%Y %X"), session['username'].encode('utf-8'), request.form['key'].encode('utf-8'), get_kpm(session['id']))
         print("[{0}] {1} submitted {2} with kpm {3}".format(*data))
 
@@ -119,48 +128,55 @@ def chal(chalid):
         if fails >= int(get_config("max_tries")) and int(get_config("max_tries")) > 0:
             return "4" #too many tries on this challenge
 
+        # TODO this might be too restrictive on large grouped challenges, consider multiplying by num of challenges
+
         # Anti-bruteforce / submitting keys too quickly
         if get_kpm(session['id']) > 10:
-            wrong = WrongKeys(session['id'], chalid, request.form['key'])
-            db.session.add(wrong)
+            for chalid in chalids:
+                wrong = WrongKeys(session['id'], chalid, request.form['key'])
+                db.session.add(wrong)
             db.session.commit()
             db.session.close()
             logger.warn("[{0}] {1} submitted {2} with kpm {3} [TOO FAST]".format(*data))
             return "3" # Submitting too fast
 
-        solves = Solves.query.filter_by(teamid=session['id'], chalid=chalid).first()
+        solves = Solves.query.filter(Solves.teamid == session['id'], Solves.chalid.in_(chalids)).all()
+        if len(solves) < num_submitted: # unsolved challenges
 
-        # Challange not solved yet
-        if not solves:
-            chal = Challenges.query.filter_by(id=chalid).first()
-            key = str(request.form['key'].strip().lower())
-            keys = json.loads(chal.flags)
-            for x in keys:
-                if x['type'] == 0: #static key
-                    print(x['flag'], key.strip().lower())
-                    if x['flag'] == key.strip().lower():
-                        solve = Solves(chalid=chalid, teamid=session['id'], ip=request.remote_addr, flag=key)
-                        db.session.add(solve)
-                        db.session.commit()
-                        db.session.close()
-                        logger.info("[{0}] {1} submitted {2} with kpm {3} [CORRECT]".format(*data))
-                        return "1" # key was correct
-                elif x['type'] == 1: #regex
-                    res = re.match(str(x['flag']), key, re.IGNORECASE)
-                    if res and res.group() == key:
-                        solve = Solves(chalid=chalid, teamid=session['id'], ip=request.remote_addr, flag=key)
-                        db.session.add(solve)
-                        db.session.commit()
-                        db.session.close()
-                        logger.info("[{0}] {1} submitted {2} with kpm {3} [CORRECT]".format(*data))
-                        return "1" # key was correct
+            solvedIds = map(lambda x: x.chalid, solves)
+            unsolvedIds = set(chalids).difference(set(solvedIds))
+            challenges = Challenges.query.filter(Challenges.id.in_(unsolvedIds)).order_by(Challenges.value).all()
 
-            wrong = WrongKeys(session['id'], chalid, request.form['key'])
-            db.session.add(wrong)
-            db.session.commit()
-            db.session.close()
-            logger.info("[{0}] {1} submitted {2} with kpm {3} [WRONG]".format(*data))
-            return '0' # key was wrong
+            for chal in challenges:
+                chalid = chal.id
+                key = str(request.form['key'].strip().lower())
+                keys = json.loads(chal.flags)
+                for x in keys:
+                    if x['type'] == 0: #static key
+                        print(x['flag'], key.strip().lower())
+                        if x['flag'] == key.strip().lower():
+                            solve = Solves(chalid=chalid, teamid=session['id'], ip=request.remote_addr, flag=key)
+                            db.session.add(solve)
+                            db.session.commit()
+                            db.session.close()
+                            logger.info("[{0}] {1} submitted {2} with kpm {3} [CORRECT]".format(*data))
+                            return "1" # key was correct
+                    elif x['type'] == 1: #regex
+                        res = re.match(str(x['flag']), key, re.IGNORECASE)
+                        if res and res.group() == key:
+                            solve = Solves(chalid=chalid, teamid=session['id'], ip=request.remote_addr, flag=key)
+                            db.session.add(solve)
+                            db.session.commit()
+                            db.session.close()
+                            logger.info("[{0}] {1} submitted {2} with kpm {3} [CORRECT]".format(*data))
+                            return "1" # key was correct
+
+                wrong = WrongKeys(session['id'], chalid, request.form['key'])
+                db.session.add(wrong)
+                db.session.commit()
+                db.session.close()
+                logger.info("[{0}] {1} submitted {2} with kpm {3} [WRONG]".format(*data))
+                return '0' # key was wrong
 
         # Challenge already solved
         else:
