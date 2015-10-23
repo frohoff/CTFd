@@ -8,12 +8,22 @@
         <input name='nonce' type='hidden' value="{{ nonce }}">
 
         <div class="row">
+            <input id="submit_enabled" name="submit_enabled" type="checkbox" {% if submit_enabled %}checked{% endif %}>
+            <label for="submit_enabled"><b>Key Submission Enabled</b> (Disable to lock game)</label>
+        </div>
+
+        <div class="row">
             <label for="start">CTF Name:</label>
             <input id='ctf_name' name='ctf_name' type='text' placeholder="CTF Name" {% if ctf_name is defined and ctf_name != None %}value="{{ ctf_name }}"{% endif %}>
         </div>
 
         <div class="row">
-            <label for="max_tries">Maximum Attempts Per Challenge (0 to disable):</label>
+            <label for="max_submit_rate">Maximum Key Submissions Per Minute Per Team (0 to disable):</label>
+            <input id='max_submit_rate' name='max_submit_rate' type='text' placeholder="0" {% if max_submit_rate is defined and max_submit_rate != None %}value="{{ max_submit_rate }}"{% endif %}>
+        </div>
+
+        <div class="row">
+            <label for="max_tries">Maximum Attempts Per Challenge Per Team (0 to disable):</label>
             <input id='max_tries' name='max_tries' type='text' placeholder="0" {% if max_tries is defined and max_tries != None %}value="{{ max_tries }}"{% endif %}>
         </div>
 

@@ -1,4 +1,4 @@
-from flask import current_app as app, render_template, request, redirect, abort, jsonify, json as json_mod, url_for, session, Blueprint
+from flask import current_app as app, flash, render_template, request, redirect, abort, jsonify, json as json_mod, url_for, session, Blueprint
 
 from CTFd.utils import ctftime, view_after_ctf, authed, unix_time, get_kpm, can_view_challenges, is_admin, get_config
 from CTFd.models import db, Challenges, Files, Solves, WrongKeys, Keys
@@ -19,6 +19,7 @@ def challenges_view():
             if view_after_ctf():
                 pass
             else:
+                flash('the CTF is currently not active')
                 return redirect('/')
     if can_view_challenges():
         return render_template('chals.html', ctftime=ctftime())
@@ -33,6 +34,7 @@ def chals():
             if view_after_ctf():
                 pass
             else:
+                flash('the CTF is currently not active')
                 return redirect('/')
     if can_view_challenges():
         chals = Challenges.query.add_columns('id', 'name', 'value', 'description', 'category').order_by(Challenges.value).all()
@@ -128,10 +130,14 @@ def chal(chalids):
         if fails >= int(get_config("max_tries")) and int(get_config("max_tries")) > 0:
             return "4" #too many tries on this challenge
 
-        # TODO this might be too restrictive on large grouped challenges, consider multiplying by num of challenges
 
+        # TODO this might be too restrictive on large grouped challenges, consider multiplying by num of challenges
+        try:
+            max_submit_rate = int(get_config("max_submit_rate"))
+        except ValueError:
+            max_submit_rate = 0
         # Anti-bruteforce / submitting keys too quickly
-        if get_kpm(session['id']) > 10:
+        if max_submit_rate and get_kpm(session['id']) > max_submit_rate:
             for chalid in chalids:
                 wrong = WrongKeys(session['id'], chalid, request.form['key'])
                 db.session.add(wrong)
@@ -143,40 +149,35 @@ def chal(chalids):
         solves = Solves.query.filter(Solves.teamid == session['id'], Solves.chalid.in_(chalids)).all()
         if len(solves) < num_submitted: # unsolved challenges
 
-            solvedIds = map(lambda x: x.chalid, solves)
-            unsolvedIds = set(chalids).difference(set(solvedIds)) # watch types here
-            challenges = Challenges.query.filter(Challenges.id.in_(unsolvedIds)).order_by(Challenges.value).all()
+            solvedIds = set(map(lambda x: x.chalid, solves))
+            unsolvedIds = set(chalids).difference(solvedIds) # watch element types here
+            challenges = Challenges.query.filter(Challenges.id.in_(chalids)).order_by(Challenges.value).all()
 
             for chal in challenges:
-                chalid = chal.id
+                chalid = int(chal.id)
                 key = str(request.form['key'].strip().lower())
                 keys = json.loads(chal.flags)
                 for x in keys:
-                    if x['type'] == 0: #static key
-                        print(x['flag'], key.strip().lower())
-                        if x['flag'] == key.strip().lower():
+                    # TODO: merge static/regex into a single case and return already-solved when appropriate
+                    if x['type'] == 0 and x['flag'] == key.strip().lower() or x['type'] == 1 and matches(key, str(x['flag'])):
+                        if chalid in unsolvedIds and chalid not in solvedIds:
                             solve = Solves(chalid=chalid, teamid=session['id'], ip=request.remote_addr, flag=key)
                             db.session.add(solve)
                             db.session.commit()
                             db.session.close()
                             logger.info("[{0}] {1} submitted {2} with kpm {3} [CORRECT]".format(*data))
                             return "1" # key was correct
-                    elif x['type'] == 1: #regex
-                        res = re.match(str(x['flag']), key, re.IGNORECASE)
-                        if res and res.group() == key:
-                            solve = Solves(chalid=chalid, teamid=session['id'], ip=request.remote_addr, flag=key)
-                            db.session.add(solve)
-                            db.session.commit()
-                            db.session.close()
-                            logger.info("[{0}] {1} submitted {2} with kpm {3} [CORRECT]".format(*data))
-                            return "1" # key was correct
+                        else:
+                            logger.info("{0} submitted {1} with kpm {2} [ALREADY SOLVED]".format(*data))
+                            return "2" # challenge was already solved
 
-                wrong = WrongKeys(session['id'], chalid, request.form['key'])
-                db.session.add(wrong)
-                db.session.commit()
-                db.session.close()
-                logger.info("[{0}] {1} submitted {2} with kpm {3} [WRONG]".format(*data))
-                return '0' # key was wrong
+                if chalid in unsolvedIds and chalid not in solvedIds:
+                    wrong = WrongKeys(session['id'], chalid, request.form['key'])
+                    db.session.add(wrong)                
+                    logger.info("[{0}] {1} submitted {2} with kpm {3} [WRONG]".format(*data))
+            db.session.commit()
+            db.session.close()
+            return '0' # key was wrong
 
         # Challenge already solved
         else:
@@ -184,3 +185,7 @@ def chal(chalids):
             return "2" # challenge was already solved
     else:
         return "-1"
+
+def matches(p, s):
+    res = re.match(s, p, re.IGNORECASE)
+    return res and res.group() == p

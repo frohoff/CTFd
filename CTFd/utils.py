@@ -154,6 +154,11 @@ def view_after_ctf():
 def ctftime():
     """ Checks whether it's CTF time or not. """
 
+    submit_enabled = get_config("submit_enabled")
+
+    if not submit_enabled:
+        return False
+
     start = get_config("start")
     end = get_config("end")
 

@@ -46,6 +46,10 @@ table{
     margin: 8px;
 }
 
+.row.extramargin {
+    margin: 25px auto 10px !important;
+}
+
 .row > h1{
     text-align: center;
 }

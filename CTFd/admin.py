@@ -64,20 +64,24 @@ def admin_config():
             prevent_registration = bool(request.form.get('prevent_registration', None))
             prevent_name_change = bool(request.form.get('prevent_name_change', None))
             view_after_ctf = bool(request.form.get('view_after_ctf', None))
+            submit_enabled = bool(request.form.get('submit_enabled', None))
         except (ValueError, TypeError):
             view_challenges_unregistered = None
             prevent_registration = None
             prevent_name_change = None
             view_after_ctf = None
+            submit_enabled = None
         finally:
             view_challenges_unregistered = set_config('view_challenges_unregistered', view_challenges_unregistered)
             prevent_registration = set_config('prevent_registration', prevent_registration)
             prevent_name_change = set_config('prevent_name_change', prevent_name_change)
             view_after_ctf = set_config('view_after_ctf', view_after_ctf)
+            submit_enabled = set_config('submit_enabled', submit_enabled)
 
         ctf_name = set_config("ctf_name", request.form.get('ctf_name', None))
         mg_api_key = set_config("mg_api_key", request.form.get('mg_api_key', None))
         max_tries = set_config("max_tries", request.form.get('max_tries', None))
+        max_submit_rate = set_config("max_submit_rate", request.form.get('max_submit_rate', None))
 
 
         db_start = Config.query.filter_by(key='start').first()
@@ -105,10 +109,20 @@ def admin_config():
         set_config('max_tries', 0)
         max_tries = 0
 
+    max_submit_rate = get_config('max_submit_rate')
+    if not max_submit_rate:
+        set_config('max_submit_rate', 10)
+        max_submit_rate = 10        
+
     view_after_ctf = get_config('view_after_ctf') == '1'
     if not view_after_ctf:
         set_config('view_after_ctf', 0)
         view_after_ctf = 0
+
+    submit_enabled = get_config('submit_enabled') == '1'
+    if not submit_enabled:
+        set_config('submit_enabled', None)
+        submit_enabled = None        
 
     start = get_config('start')
     if not start:
@@ -138,7 +152,9 @@ def admin_config():
                            view_challenges_unregistered=view_challenges_unregistered,
                            prevent_registration=prevent_registration, mg_api_key=mg_api_key,
                            prevent_name_change=prevent_name_change,
-                           view_after_ctf=view_after_ctf)
+                           view_after_ctf=view_after_ctf,
+                           max_submit_rate=max_submit_rate,
+                           submit_enabled=submit_enabled)
 
 
 @admin.route('/admin/css', methods=['GET', 'POST'])
@@ -337,11 +353,11 @@ def admin_team(teamid):
     if request.method == 'GET':
         return render_template('admin/team.html', solves=solves, team=user, addrs=addrs, score=score, place=place, wrong_keys=wrong_keys)
     elif request.method == 'POST':
-        admin_user = request.form.get('admin', "false")
-        admin_user = 1 if admin_user == "true" else 0
-        if admin:
-            user.admin = 1
-            user.banned = 1
+        admin_user = request.form.get('admin')
+        if admin_user:
+            admin_user = 1 if admin_user == "true" else 0
+            user.admin = admin_user
+            user.banned = admin_user
             db.session.commit()
             return jsonify({'data': ['success']})
 

@@ -77,6 +77,14 @@ function loadchalbyname(chalname) {
       if (chal.name == chalname) {
         obj = chal;
       }
+      if (chal.grouped) {
+        for (j in chal.members) {
+          mem = chal.members[j];
+          if (mem.name == chalname) {
+            obj = mem;
+          }
+        }
+      }
     }
   }
 
@@ -186,7 +194,7 @@ function marksolves() {
               solvedValue = solve && solve.value || 0;
             }           
 
-            if (solvedValue == chal.value || 0) {
+            if (chal.value && solvedValue == chal.value) {
                 elt.addClass('secondary')
                 elt.css('opacity', '0.3');
             } else if (solvedValue > 0) {                             
@@ -200,9 +208,9 @@ function marksolves() {
             $('#challenges button[value="' + id + '"]').addClass('secondary')
             $('#challenges button[value="' + id + '"]').css('opacity', '0.3')
         };*/
-        if (window.location.hash.length > 0){
-          loadchalbyname(window.location.hash.substring(1))
-        }
+        // if (window.location.hash.length > 0){
+        //   loadchalbyname(window.location.hash.substring(1))
+        // }
     });
 }
 
@@ -214,9 +222,9 @@ function marktoomanyattempts() {
             $('#challenges button[value="' + id + '"]').addClass('secondary')
             $('#challenges button[value="' + id + '"]').css('background-color', '#FF9999')
         };
-        if (window.location.hash.length > 0){
-          loadchalbyname(window.location.hash.substring(1))
-        }
+        // if (window.location.hash.length > 0){
+        //   loadchalbyname(window.location.hash.substring(1))
+        // }
     });
 }
 
@@ -340,6 +348,9 @@ function loadchals() {
     $.get("/chals", function (data) {
         categories = [];
         challenges = $.parseJSON(JSON.stringify(data));
+        for (var i = challenges['game'].length - 1; i >= 0; i--) {
+            challenges['game'][i].solves = 0;
+        }
         var grouped = groupchals(challenges['game']);
 
 /*        for (var i = challenges['game'].length - 1; i >= 0; i--) {

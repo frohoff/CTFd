@@ -164,7 +164,7 @@ function loadchals(){
 
         for (var i = 0; i <= challenges['game'].length - 1; i++) {
             var chal = challenges['game'][i]
-            var chal_button = $('<button class="chal-button" value="{0}"><p>{1}</p><span>{2}</span></button>'.format(chal.id, chal.name, chal.value))
+            var chal_button = $('<button class="chal-button" value="{0}" title="{1}"><p>{1}</p><span>{2}</span></button>'.format(chal.id, chal.name, chal.value))
             $('#' + challenges['game'][i].category.replace(/ /g,"-").hashCode()).append(chal_button);
         };
 

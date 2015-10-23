@@ -84,7 +84,11 @@ def setup():
             ## Allow/Disallow registration
             prevent_registration = Config('prevent_registration', None)
 
-            setup = Config('setup', True)
+            enabled = Config('ehabled', True)
+
+            setup = Config('setup', True)   
+
+            max_submit_rate = Config('max_submit_rate', 10)
 
             db.session.add(ctf_name)
             db.session.add(admin)
@@ -96,6 +100,8 @@ def setup():
             db.session.add(prevent_registration)
             db.session.add(css)
             db.session.add(setup)
+            db.session.add(enabled)
+            db.session.add(max_submit_rate)
             db.session.commit()
             app.setup = False
             return redirect('/')

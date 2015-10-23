@@ -9,7 +9,7 @@ scoreboard = Blueprint('scoreboard', __name__)
 def scoreboard_view():
     score = db.func.sum(Challenges.value).label('score')
     quickest = db.func.max(Solves.date).label('quickest')
-    teams = db.session.query(Solves.teamid, Teams.name, score).join(Teams).join(Challenges).filter(Teams.banned == None).group_by(Solves.teamid).order_by(score.desc(), quickest)
+    teams = db.session.query(Solves.teamid, Teams.name, score).join(Teams).join(Challenges).filter((Teams.banned == None) | (Teams.banned == 0)).group_by(Solves.teamid).order_by(score.desc(), quickest).all()
     db.session.close()
     return render_template('scoreboard.html', teams=teams)
 
@@ -18,7 +18,7 @@ def scoreboard_view():
 def scores():
     score = db.func.sum(Challenges.value).label('score')
     quickest = db.func.max(Solves.date).label('quickest')
-    teams = db.session.query(Solves.teamid, Teams.name, score).join(Teams).join(Challenges).filter(Teams.banned == None).group_by(Solves.teamid).order_by(score.desc(), quickest)
+    teams = db.session.query(Solves.teamid, Teams.name, score).join(Teams).join(Challenges).filter((Teams.banned == None) | (Teams.banned == 0)).group_by(Solves.teamid).order_by(score.desc(), quickest).all()
     db.session.close()
     json = {'standings':[]}
     for i, x in enumerate(teams):
@@ -39,7 +39,7 @@ def topteams(count):
 
     score = db.func.sum(Challenges.value).label('score')
     quickest = db.func.max(Solves.date).label('quickest')
-    teams = db.session.query(Solves.teamid, Teams.name, score).join(Teams).join(Challenges).filter(Teams.banned == None).group_by(Solves.teamid).order_by(score.desc(), quickest).limit(count)
+    teams = db.session.query(Solves.teamid, Teams.name, score).join(Teams).join(Challenges).filter((Teams.banned == None) | (Teams.banned == 0)).group_by(Solves.teamid).order_by(score.desc(), quickest).limit(count)
 
     for team in teams:
         solves = Solves.query.filter_by(teamid=team.teamid).all()
