@@ -19,7 +19,7 @@ def challenges_view():
             if view_after_ctf():
                 pass
             else:
-                flash('the CTF is currently not active')
+                flash('the CTF challenges are not currently available')
                 return redirect('/')
     if can_view_challenges():
         return render_template('chals.html', ctftime=ctftime())
@@ -34,7 +34,7 @@ def chals():
             if view_after_ctf():
                 pass
             else:
-                flash('the CTF is currently not active')
+                flash('the CTF challenges are not currently available')
                 return redirect('/')
     if can_view_challenges():
         chals = Challenges.query.add_columns('id', 'name', 'value', 'description', 'category').order_by(Challenges.value).all()

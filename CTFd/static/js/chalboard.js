@@ -1,3 +1,25 @@
+
+var hashchangeenabled = true;
+$(document).ready(function(){
+  console.info("binding")
+  $(window).bind('hashchange', function(){
+    console.info("hashchange")
+    console.info(window.location.hash)
+    if (hashchangeenabled) {
+      if (window.location.hash.length > 0){
+        loadchalbyname(decodeURIComponent(window.location.hash.substring(1)))
+      }
+    } else {
+      hashchangeenabled = true;
+    }
+  });
+});
+
+function changehash(h) {
+  hashchangeenabled = false;
+  window.location.hash = h;
+}
+
 //http://stackoverflow.com/a/2648463 - wizardry!
 String.prototype.format = String.prototype.f = function() {
     var s = this,
@@ -39,10 +61,13 @@ function loadchal(id) {
         }
       }
     }
+
+    if (!obj) return;
 /*    obj = $.grep(challenges['game'], function (e) {
         return e.id == id;
     })[0]*/
-    window.location.hash = obj.name
+    //window.location.hash = obj.name
+    changehash(obj.name);
     $('#chal-window .chal-name').text(obj.name)
     $('#chal-window .chal-desc').html(marked(obj.description, {'gfm':true, 'breaks':true}))
 
@@ -88,7 +113,10 @@ function loadchalbyname(chalname) {
     }
   }
 
-  window.location.hash = obj.name
+  if (!obj) return;
+
+  changehash(obj.name);
+  //window.location.hash = obj.name
   $('#chal-window .chal-name').text(obj.name)
   $('#chal-window .chal-desc').html(marked(obj.description, {'gfm':true, 'breaks':true}))
 
@@ -343,7 +371,7 @@ function groupchals(chals) {
   return cats;
 }
 
-function loadchals() {
+function loadchals(cb) {
 
     $.get("/chals", function (data) {
         categories = [];
@@ -394,6 +422,8 @@ function loadchals() {
             loadchal(this.value);
         });
 
+        if (cb) cb();
+
     });
 }
 
@@ -426,8 +456,8 @@ function colorhash (x) {
     return "#" + color.substring(0, 6)
 }
 
-$(document).on('close', '[data-reveal]', function () {
-  window.location.hash = ""
+$(document).on('closed.fndtn.reveal', '[data-reveal]', function () {
+  changehash("")
 });
 
 // function solves_graph() {
@@ -453,7 +483,8 @@ function update(){
 }
 
 $(function() {
-    loadchals()
+    loadchals(function(){ $(window).trigger('hashchange'); })
+    
     // solves_graph()
 });
 
